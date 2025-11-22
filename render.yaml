@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: vedaos-searxng
+    env: docker
+    plan: starter
+    autoDeploy: true
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: SEARXNG_BASE_URL
+        fromService:
+          type: web
+          name: vedaos-searxng
+          property: host
+      - key: SEARXNG_SECRET_KEY
+        generateValue: true
+    healthCheckPath: /healthz
+    buildCommand: ""
+    startCommand: ""
+    
+    # Auto-scaling configuration
+    numInstances: 1
+    
+    # Custom headers for CORS
+    headers:
+      - path: /*
+        name: Access-Control-Allow-Origin
+        value: "*"
+      - path: /*
+        name: Access-Control-Allow-Methods
+        value: "GET, POST, OPTIONS"
+      - path: /*
+        name: Access-Control-Allow-Headers
+        value: "Content-Type, Authorization"

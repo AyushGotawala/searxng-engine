@@ -1,0 +1,100 @@
+# VedaOS SearxNG Configuration
+# Optimized for production use with VedaOS
+
+use_default_settings: true
+
+general:
+  debug: false
+  instance_name: "VedaOS Search Service"
+  privacypolicy_url: false
+  donation_url: false
+  contact_url: false
+  enable_metrics: false
+
+server:
+  port: 8080
+  bind_address: "0.0.0.0"
+  base_url: false  # Will be set via environment variable
+  image_proxy: false
+  public_instance: false
+  limiter: false
+  secret_key: "vedaos-development-secret-key-change-in-production"
+
+search:
+  safe_search: 1
+  autocomplete: "google"
+  default_lang: "auto"
+  max_page: 3
+  formats:
+    - html
+    - json
+
+ui:
+  static_use_hash: false
+  default_theme: simple
+  default_locale: ""
+  infinite_scroll: false
+  query_in_title: false
+
+# Redis configuration (optional - for caching)
+redis:
+  url: "redis://redis:6379/0"
+
+# Search engines configuration
+engines:
+  # Primary search engines
+  - name: google
+    engine: google
+    use_mobile_ui: false
+    weight: 1.0
+    
+  - name: bing
+    engine: bing
+    weight: 0.8
+    
+  - name: duckduckgo
+    engine: duckduckgo
+    weight: 0.7
+    
+  - name: startpage
+    engine: startpage
+    weight: 0.6
+
+  # Knowledge sources
+  - name: wikipedia
+    engine: wikipedia
+    weight: 1.0
+    
+  - name: wikidata
+    engine: wikidata
+    weight: 0.5
+
+  # News sources
+  - name: google news
+    engine: google_news
+    weight: 1.0
+    
+  - name: bing news
+    engine: bing_news
+    weight: 0.8
+
+# Request configuration for better performance
+outgoing:
+  request_timeout: 8.0
+  max_request_timeout: 15.0
+  pool_connections: 100
+  pool_maxsize: 20
+  enable_http2: true
+
+# Disable unwanted engines
+disabled_engines:
+  - torrentz
+  - piratebay
+  - btdigg
+  - kickass
+  - seedpeer
+  - torrentdownloads
+  - isohunt
+  - torrentfunk
+  - torrentproject
+  - nyaa

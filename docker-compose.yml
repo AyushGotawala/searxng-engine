@@ -1,0 +1,49 @@
+services:
+  searxng:
+    build: .
+    container_name: vedaos-searxng-service
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8081/
+      - SEARXNG_SECRET_KEY=vedaos-development-secret-key-change-in-production
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - redis
+
+  redis:
+    image: "redis:alpine"
+    container_name: vedaos-redis-cache
+    command: redis-server --save "" --appendonly "no"
+    restart: unless-stopped
+    tmpfs:
+      - /var/lib/redis
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
