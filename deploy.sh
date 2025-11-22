@@ -1,126 +1,190 @@
 #!/bin/bash
 
-# VedaOS SearxNG Service - Deployment Script
-# This script helps deploy the SearxNG service to various platforms
+# VedaOS SearxNG Service Deployment Script
+# Supports both local development and production testing
 
 set -e
 
-echo "🔍 VedaOS SearxNG Service Deployment"
-echo "===================================="
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
-# Function to check dependencies
-check_dependencies() {
-    echo "📋 Checking dependencies..."
-    
-    if ! command -v docker &> /dev/null; then
-        echo "❌ Docker is not installed. Please install Docker first."
-        exit 1
-    fi
-    
-    if ! command -v git &> /dev/null; then
-        echo "❌ Git is not installed. Please install Git first."
-        exit 1
-    fi
-    
-    echo "✅ All dependencies found"
+# Print colored output
+print_status() {
+    echo -e "${BLUE}[INFO]${NC} $1"
 }
 
-# Function to test local deployment
-test_local() {
-    echo "🧪 Testing local deployment..."
+print_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Function to check if Docker is running
+check_docker() {
+    if ! docker info > /dev/null 2>&1; then
+        print_error "Docker is not running. Please start Docker and try again."
+        exit 1
+    fi
+}
+
+# Function to check if ports are available
+check_port() {
+    local port=$1
+    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+        print_warning "Port $port is already in use. Please stop the service using that port."
+        echo "You can find what's using the port with: lsof -i :$port"
+        return 1
+    fi
+    return 0
+}
+
+# Function to wait for service to be ready
+wait_for_service() {
+    local url=$1
+    local max_attempts=30
+    local attempt=1
     
-    # Start services
-    docker-compose up --build -d
+    print_status "Waiting for service to be ready at $url..."
     
-    # Wait for services to be ready
-    echo "⏳ Waiting for services to start..."
-    sleep 30
+    while [ $attempt -le $max_attempts ]; do
+        if curl -s -f "$url" > /dev/null 2>&1; then
+            print_success "Service is ready!"
+            return 0
+        fi
+        
+        echo -n "."
+        sleep 2
+        ((attempt++))
+    done
     
-    # Test the service
-    echo "🔍 Testing search endpoint..."
-    if curl -f -s "http://localhost:8080/search?q=test&format=json" > /dev/null; then
-        echo "✅ Local deployment successful!"
-        echo "🌐 Service running at: http://localhost:8080"
-        echo "🧪 Test search: curl \"http://localhost:8080/search?q=test&format=json\""
+    print_error "Service failed to start within expected time"
+    return 1
+}
+
+# Main deployment function
+deploy() {
+    local mode=$1
+    
+    print_status "Starting VedaOS SearxNG deployment in $mode mode..."
+    
+    # Check prerequisites
+    check_docker
+    
+    if [ "$mode" = "local" ]; then
+        # Local development mode with Redis
+        print_status "Deploying in LOCAL DEVELOPMENT mode with Redis caching..."
+        
+        check_port 8081 || exit 1
+        
+        # Stop any existing services
+        print_status "Stopping any existing services..."
+        docker-compose -f docker-compose.local.yml down 2>/dev/null || true
+        
+        # Build and start services
+        print_status "Building and starting services..."
+        docker-compose -f docker-compose.local.yml up --build -d
+        
+        # Wait for services to be ready
+        wait_for_service "http://localhost:8081"
+        
+        print_success "Local development deployment complete!"
+        echo ""
+        echo "🔗 Service URLs:"
+        echo "   Web Interface: http://localhost:8081"
+        echo "   API Endpoint:  http://localhost:8081/search?q=test&format=json"
+        echo ""
+        echo "📋 Available Commands:"
+        echo "   View logs:     docker-compose -f docker-compose.local.yml logs -f"
+        echo "   Stop services: docker-compose -f docker-compose.local.yml down"
+        echo "   Test API:      curl 'http://localhost:8081/search?q=python&format=json' | jq '.'"
+        
+    elif [ "$mode" = "production" ]; then
+        # Production mode without Redis (simulates Render deployment)
+        print_status "Deploying in PRODUCTION TEST mode (single container, no Redis)..."
+        
+        check_port 8081 || exit 1
+        
+        # Stop any existing services
+        print_status "Stopping any existing services..."
+        docker-compose down 2>/dev/null || true
+        
+        # Build and start service
+        print_status "Building and starting service..."
+        docker-compose up --build -d
+        
+        # Wait for service to be ready
+        wait_for_service "http://localhost:8081"
+        
+        print_success "Production test deployment complete!"
+        echo ""
+        echo "🔗 Service URLs:"
+        echo "   Web Interface: http://localhost:8081"
+        echo "   API Endpoint:  http://localhost:8081/search?q=test&format=json"
+        echo ""
+        echo "📋 Available Commands:"
+        echo "   View logs:     docker-compose logs -f"
+        echo "   Stop service:  docker-compose down"
+        echo "   Test API:      curl 'http://localhost:8081/search?q=python&format=json' | jq '.'"
+        echo ""
+        echo "💡 This mode simulates the Render.com production environment"
+        
     else
-        echo "❌ Local deployment failed!"
-        docker-compose logs --tail=50 searxng
+        print_error "Invalid mode specified. Use 'local' or 'production'"
+        show_usage
         exit 1
     fi
 }
 
-# Function to prepare for Git deployment
-prepare_git() {
-    echo "📦 Preparing for Git deployment..."
-    
-    # Initialize git if not already done
-    if [ ! -d ".git" ]; then
-        git init
-        echo "✅ Git repository initialized"
-    fi
-    
-    # Add all files
-    git add .
-    git status
-    
-    echo "📝 Ready to commit. Run:"
-    echo "   git commit -m \"Initial VedaOS SearxNG service setup\""
-    echo "   git remote add origin <your-github-repo-url>"
-    echo "   git push -u origin main"
-}
-
-# Function to generate Render deployment URL
-generate_render_url() {
-    echo "🚀 Render.com Deployment Instructions"
-    echo "======================================"
+# Function to show usage
+show_usage() {
     echo ""
-    echo "1. Push this repository to GitHub:"
-    echo "   git remote add origin https://github.com/YOUR_USERNAME/vedaos-searxng-service.git"
-    echo "   git push -u origin main"
+    echo "Usage: $0 [local|production]"
     echo ""
-    echo "2. Deploy on Render.com:"
-    echo "   • Go to https://dashboard.render.com/"
-    echo "   • Click 'New +' → 'Blueprint'"
-    echo "   • Connect your GitHub repository"
-    echo "   • Render will automatically use render.yaml"
+    echo "Modes:"
+    echo "  local       - Deploy with Redis for local development"
+    echo "  production  - Deploy single container for production testing"
     echo ""
-    echo "3. Your service will be available at:"
-    echo "   https://vedaos-searxng.onrender.com"
-    echo ""
-    echo "4. Update your VedaOS app environment:"
-    echo "   SEARXNG_BASE_URL=https://vedaos-searxng.onrender.com"
+    echo "Examples:"
+    echo "  $0 local       # Start local development environment"
+    echo "  $0 production  # Start production test environment"
     echo ""
 }
 
 # Main script logic
-case "${1:-help}" in
-    "local")
-        check_dependencies
-        test_local
-        ;;
-    "prepare")
-        prepare_git
-        ;;
-    "render")
-        generate_render_url
-        ;;
-    "full")
-        check_dependencies
-        test_local
-        prepare_git
-        generate_render_url
-        ;;
-    "help"|*)
-        echo "Usage: $0 {local|prepare|render|full}"
-        echo ""
-        echo "Commands:"
-        echo "  local   - Test local deployment with Docker Compose"
-        echo "  prepare - Prepare Git repository for deployment"
-        echo "  render  - Show Render.com deployment instructions"
-        echo "  full    - Run all steps above"
-        echo ""
-        ;;
-esac
+main() {
+    if [ $# -eq 0 ]; then
+        print_error "No deployment mode specified"
+        show_usage
+        exit 1
+    fi
+    
+    case "$1" in
+        "local"|"development"|"dev")
+            deploy "local"
+            ;;
+        "production"|"prod"|"test")
+            deploy "production"
+            ;;
+        "help"|"-h"|"--help")
+            show_usage
+            ;;
+        *)
+            print_error "Unknown mode: $1"
+            show_usage
+            exit 1
+            ;;
+    esac
+}
 
-echo ""
-echo "✨ VedaOS SearxNG Service setup complete!"
+# Run the main function with all arguments
+main "$@"

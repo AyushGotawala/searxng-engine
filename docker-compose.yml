@@ -1,3 +1,4 @@
+# Docker Compose for Production Testing (Single Container)
 services:
   searxng:
     build: .
@@ -9,7 +10,7 @@ services:
       - ./settings.yml:/etc/searxng/settings.yml:ro
     environment:
       - SEARXNG_BASE_URL=http://localhost:8081/
-      - SEARXNG_SECRET_KEY=vedaos-development-secret-key-change-in-production
+      - SEARXNG_SECRET_KEY=vedaos-production-secret-key
     cap_drop:
       - ALL
     cap_add:
@@ -21,29 +22,8 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    depends_on:
-      - redis
-
-  redis:
-    image: "redis:alpine"
-    container_name: vedaos-redis-cache
-    command: redis-server --save "" --appendonly "no"
-    restart: unless-stopped
-    tmpfs:
-      - /var/lib/redis
-    cap_drop:
-      - ALL
-    cap_add:
-      - SETGID
-      - SETUID
-      - DAC_OVERRIDE
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "2"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
       retries: 3
