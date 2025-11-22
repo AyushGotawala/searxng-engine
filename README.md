@@ -26,7 +26,7 @@ This repository contains a containerized SearxNG search engine service specifica
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/searxng-engine.git
+   git clone https://github.com/AyushGotawala/searxng-engine.git
    cd searxng-engine
    ```
 
